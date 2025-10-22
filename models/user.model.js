@@ -31,6 +31,14 @@ const userSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    access_token: {
+      type: String,
+      default: "",
+    },
+    refresh_token: {
+      type: String,
+      default: "",
+    },
     last_login_date: {
       type: Date,
       default: "",
