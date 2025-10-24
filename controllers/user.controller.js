@@ -7,8 +7,10 @@ import VerificationEmailTemplate from "../utils/verifyEmailTemplate.js";
 import generatedAccessToken from "../utils/generatedAccessToken.js";
 import generatedRefreshToken from "../utils/generatedRefreshToken.js";
 
-import { v2 as cloudinary } from "cloudinary";
+// import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
+
+import cloudinary from "cloudinary";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CONFIG_CLOUD_NAME,
@@ -235,33 +237,63 @@ export async function logoutController(request, response) {
 }
 
 export async function userAvatarController(request, response) {
+  let filePathToDelete = null; // ← Variável para guardar o caminho do arquivo
+
   try {
-    console.log("=== INICIANDO UPLOAD ===");
-    console.log("Request files:", request.files);
-    console.log("Request file (single):", request.file);
+    // console.log("=== UPLOAD PARA CLOUDINARY ===");
 
-    // Como estamos usando .single(), o arquivo vai para request.file
-    const file = request.file;
+    const userId = request.userId;
+    const file = request.file || (request.files && request.files[0]);
 
-    // Verifica SE existe arquivo
-    if (!file) {
-      console.log("NENHUM ARQUIVO RECEBIDO - request.file está vazio");
-      return response.status(400).json({
-        message: "Nenhum arquivo recebido pelo servidor",
-        details: "Verifique se o campo 'avatar' está correto",
+    const user = await UserModel.findOne({ _id: userId });
+    if (!user) {
+      return response.status(500).json({
+        message: "User not found",
         error: true,
         success: false,
       });
     }
 
-    console.log("Arquivo recebido com sucesso:", {
-      filename: file.filename,
-      size: file.size,
-      path: file.path,
-      mimetype: file.mimetype,
-    });
+    // First remove avatar image if theres one
+    const imgUrl = user.avatar;
+    const urlArr = imgUrl.split("/");
 
-    // Configurações do Cloudinary
+    const avatarImage = urlArr[urlArr.length - 1];
+
+    const imageName = avatarImage.split(".")[0];
+
+    if (imageName) {
+      const res = await cloudinary.uploader.destroy(
+        imageName,
+        (error, result) => {
+          console.log(error, result);
+        }
+      );
+
+      if (res) {
+        response.status(200).json({
+          message: "Image Uploaded with success!",
+        });
+      }
+    }
+
+    if (!file) {
+      return response.status(400).json({
+        message: "Nenhum arquivo recebido",
+        error: true,
+        success: false,
+      });
+    }
+
+    // Guarda o caminho do arquivo para deletar depois
+    filePathToDelete = file.path;
+
+    // console.log("Arquivo recebido:", {
+    //   filename: file.filename,
+    //   size: file.size,
+    //   path: file.path,
+    // });
+
     const options = {
       use_filename: true,
       unique_filename: false,
@@ -274,11 +306,15 @@ export async function userAvatarController(request, response) {
     const result = await cloudinary.uploader.upload(file.path, options);
     console.log("Upload Cloudinary bem-sucedido:", result.secure_url);
 
-    // Deleta arquivo local - AGORA COM import fs
+    // 🔥 DELETA O ARQUIVO LOCAL APÓS UPLOAD BEM-SUCEDIDO
     if (fs.existsSync(file.path)) {
       fs.unlinkSync(file.path);
-      console.log("Arquivo local deletado");
+      // console.log("Arquivo local deletado com sucesso");
+      filePathToDelete = null; // Já foi deletado
     }
+
+    user.avatar = result.secure_url;
+    await user.save();
 
     return response.status(200).json({
       _id: request.userId,
@@ -287,12 +323,44 @@ export async function userAvatarController(request, response) {
       fileSize: file.size,
     });
   } catch (error) {
-    console.error("Erro no controller:", error.message);
-    console.error("Stack:", error.stack);
+    // console.error("Erro no controller:", error.message);
+
+    // 🔥 DELETA O ARQUIVO LOCAL MESMO EM CASO DE ERRO
+    if (filePathToDelete && fs.existsSync(filePathToDelete)) {
+      try {
+        fs.unlinkSync(filePathToDelete);
+        // console.log("Arquivo local deletado após erro");
+      } catch (deleteError) {
+        console.error("Erro ao deletar arquivo:", deleteError.message);
+      }
+    }
+
     return response.status(500).json({
       message: error.message,
       error: true,
       success: false,
     });
+  }
+}
+
+export async function removerImageFromCloudinary(request, response) {
+  const imgUrl = request.query.img;
+  const urlArr = imgUrl.split("/");
+
+  const image = urlArr[urlArr.length - 1];
+
+  const imageName = image.split(".")[0];
+
+  if (imageName) {
+    const res = await cloudinary.uploader.destroy(
+      imageName,
+      (error, result) => {
+        console.log(error, result);
+      }
+    );
+
+    if (res) {
+      response.status(200).send(res);
+    }
   }
 }
