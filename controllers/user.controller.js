@@ -237,46 +237,23 @@ export async function logoutController(request, response) {
 }
 
 export async function userAvatarController(request, response) {
-  let filePathToDelete = null; // ← Variável para guardar o caminho do arquivo
+  let file = null;
 
   try {
-    // console.log("=== UPLOAD PARA CLOUDINARY ===");
-
     const userId = request.userId;
-    const file = request.file || (request.files && request.files[0]);
+    file = request.file || (request.files && request.files[0]);
 
+    // Checking if user exist
     const user = await UserModel.findOne({ _id: userId });
     if (!user) {
-      return response.status(500).json({
+      return response.status(404).json({
         message: "User not found",
         error: true,
         success: false,
       });
     }
 
-    // First remove avatar image if theres one
-    const imgUrl = user.avatar;
-    const urlArr = imgUrl.split("/");
-
-    const avatarImage = urlArr[urlArr.length - 1];
-
-    const imageName = avatarImage.split(".")[0];
-
-    if (imageName) {
-      const res = await cloudinary.uploader.destroy(
-        imageName,
-        (error, result) => {
-          console.log(error, result);
-        }
-      );
-
-      if (res) {
-        response.status(200).json({
-          message: "Image Uploaded with success!",
-        });
-      }
-    }
-
+    // Checking if theres a file
     if (!file) {
       return response.status(400).json({
         message: "Nenhum arquivo recebido",
@@ -285,14 +262,22 @@ export async function userAvatarController(request, response) {
       });
     }
 
-    // Guarda o caminho do arquivo para deletar depois
-    filePathToDelete = file.path;
+    // Remove old avatar if exist
+    if (user.avatar) {
+      try {
+        const imgUrl = user.avatar;
+        const urlArr = imgUrl.split("/");
+        const avatarImage = urlArr[urlArr.length - 1];
+        const imageName = avatarImage.split(".")[0];
 
-    // console.log("Arquivo recebido:", {
-    //   filename: file.filename,
-    //   size: file.size,
-    //   path: file.path,
-    // });
+        if (imageName) {
+          await cloudinary.uploader.destroy(imageName);
+          console.log("Imagem anterior deletada do Cloudinary");
+        }
+      } catch (deleteError) {
+        console.error("Erro ao deletar imagem anterior:", deleteError);
+      }
+    }
 
     const options = {
       use_filename: true,
@@ -302,34 +287,34 @@ export async function userAvatarController(request, response) {
 
     console.log("Fazendo upload para Cloudinary...");
 
-    // Faz o upload para o Cloudinary
+    // Upload image
     const result = await cloudinary.uploader.upload(file.path, options);
     console.log("Upload Cloudinary bem-sucedido:", result.secure_url);
 
-    // 🔥 DELETA O ARQUIVO LOCAL APÓS UPLOAD BEM-SUCEDIDO
+    // Delete local file
     if (fs.existsSync(file.path)) {
       fs.unlinkSync(file.path);
-      // console.log("Arquivo local deletado com sucesso");
-      filePathToDelete = null; // Já foi deletado
+      console.log("Arquivo local deletado com sucesso");
     }
 
+    // Update user avatar
     user.avatar = result.secure_url;
     await user.save();
 
     return response.status(200).json({
-      _id: request.userId,
+      _id: userId,
       avatar: result.secure_url,
       message: "Upload realizado com sucesso!",
       fileSize: file.size,
     });
   } catch (error) {
-    // console.error("Erro no controller:", error.message);
+    console.error("Erro no controller:", error.message);
 
-    // 🔥 DELETA O ARQUIVO LOCAL MESMO EM CASO DE ERRO
-    if (filePathToDelete && fs.existsSync(filePathToDelete)) {
+    // Delete local file if there's an error
+    if (file && file.path && fs.existsSync(file.path)) {
       try {
-        fs.unlinkSync(filePathToDelete);
-        // console.log("Arquivo local deletado após erro");
+        fs.unlinkSync(file.path);
+        console.log("Arquivo local deletado após erro");
       } catch (deleteError) {
         console.error("Erro ao deletar arquivo:", deleteError.message);
       }
