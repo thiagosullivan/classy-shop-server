@@ -1,10 +1,21 @@
-import UserModel from "../models/user.model.js";
 import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
+
+import UserModel from "../models/user.model.js";
 import sendEmailFun from "../config/sendEmail.js";
 import VerificationEmailTemplate from "../utils/verifyEmailTemplate.js";
 import generatedAccessToken from "../utils/generatedAccessToken.js";
 import generatedRefreshToken from "../utils/generatedRefreshToken.js";
+
+import { v2 as cloudinary } from "cloudinary";
+import fs from "fs";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CONFIG_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_CONFIG_API_KEY,
+  api_secret: process.env.CLOUDINARY_CONFIG_API_SECRET,
+  secure: true,
+});
 
 export async function registerUserController(request, response) {
   try {
@@ -217,6 +228,69 @@ export async function logoutController(request, response) {
   } catch (error) {
     return response.status(500).json({
       message: error.message || error,
+      error: true,
+      success: false,
+    });
+  }
+}
+
+export async function userAvatarController(request, response) {
+  try {
+    console.log("=== INICIANDO UPLOAD ===");
+    console.log("Request files:", request.files);
+    console.log("Request file (single):", request.file);
+
+    // Como estamos usando .single(), o arquivo vai para request.file
+    const file = request.file;
+
+    // Verifica SE existe arquivo
+    if (!file) {
+      console.log("NENHUM ARQUIVO RECEBIDO - request.file está vazio");
+      return response.status(400).json({
+        message: "Nenhum arquivo recebido pelo servidor",
+        details: "Verifique se o campo 'avatar' está correto",
+        error: true,
+        success: false,
+      });
+    }
+
+    console.log("Arquivo recebido com sucesso:", {
+      filename: file.filename,
+      size: file.size,
+      path: file.path,
+      mimetype: file.mimetype,
+    });
+
+    // Configurações do Cloudinary
+    const options = {
+      use_filename: true,
+      unique_filename: false,
+      overwrite: false,
+    };
+
+    console.log("Fazendo upload para Cloudinary...");
+
+    // Faz o upload para o Cloudinary
+    const result = await cloudinary.uploader.upload(file.path, options);
+    console.log("Upload Cloudinary bem-sucedido:", result.secure_url);
+
+    // Deleta arquivo local - AGORA COM import fs
+    if (fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+      console.log("Arquivo local deletado");
+    }
+
+    return response.status(200).json({
+      _id: request.userId,
+      avatar: result.secure_url,
+      message: "Upload realizado com sucesso!",
+      fileSize: file.size,
+    });
+  } catch (error) {
+    console.error("Erro no controller:", error.message);
+    console.error("Stack:", error.stack);
+    return response.status(500).json({
+      message: error.message,
       error: true,
       success: false,
     });
