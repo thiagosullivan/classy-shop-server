@@ -8,6 +8,7 @@ import {
   updateUserDetails,
   userAvatarController,
   verifyEmailController,
+  verifyForgotPasswordOtp,
 } from "../controllers/user.controller.js";
 import auth from "../middlewares/auth.js";
 import upload from "../middlewares/multer.js";
@@ -20,6 +21,7 @@ userRouter.get("/logout", auth, logoutController);
 userRouter.put("/user-avatar", auth, upload.any(), userAvatarController);
 userRouter.delete("/delete-image", auth, removerImageFromCloudinary);
 userRouter.put("/:id", auth, updateUserDetails);
-userRouter.put("/forgot-password", forgotPasswordController);
+userRouter.post("/forgot-password", forgotPasswordController);
+userRouter.put("/verify-forgot-password-otp", verifyForgotPasswordOtp);
 
 export default userRouter;

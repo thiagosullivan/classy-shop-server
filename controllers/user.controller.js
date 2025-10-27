@@ -463,3 +463,62 @@ export async function forgotPasswordController(request, response) {
     });
   }
 }
+
+export async function verifyForgotPasswordOtp(request, response) {
+  try {
+    const { email, otp } = request.body;
+
+    const user = await UserModel.findOne({ email: email });
+
+    if (!user) {
+      return response.status(400).json({
+        message: "Email not available",
+        error: true,
+        success: false,
+      });
+    }
+
+    if (!email || !otp) {
+      return response.status(400).json({
+        message: "Provide required field email or otp",
+        error: true,
+        success: false,
+      });
+    }
+
+    if (otp !== user.otp) {
+      return response.status(400).json({
+        message: "Invalid OTP",
+        error: true,
+        success: false,
+      });
+    }
+
+    const currentTime = new Date().toISOString();
+
+    if (user.otpExpires < currentTime) {
+      return response.status(400).json({
+        message: "OTP is expired",
+        error: true,
+        success: false,
+      });
+    }
+
+    user.otp = "";
+    user.otpExpires = "";
+
+    await user.save();
+
+    return response.status(200).json({
+      message: "Verify OTP successfully",
+      error: false,
+      success: true,
+    });
+  } catch (error) {
+    return response.status(400).json({
+      message: error.message || error,
+      error: true,
+      success: false,
+    });
+  }
+}
