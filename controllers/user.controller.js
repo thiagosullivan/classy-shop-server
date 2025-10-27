@@ -161,6 +161,14 @@ export async function loginUserController(request, response) {
       });
     }
 
+    if (user.verify_email !== true) {
+      response.status(400).json({
+        message: "Your email is not verify yet, please verify your email first",
+        error: true,
+        success: false,
+      });
+    }
+
     const checkPassword = await bcryptjs.compare(password, user.password);
 
     if (!checkPassword) {
@@ -347,5 +355,68 @@ export async function removerImageFromCloudinary(request, response) {
     if (res) {
       response.status(200).send(res);
     }
+  }
+}
+
+export async function updateUserDetails(request, response) {
+  try {
+    const userId = request.userId;
+    const { name, email, mobile, password } = request.body;
+
+    const userExist = await UserModel.findById(userId);
+    if (!userExist) {
+      return response.status(400).send("The user cannot be Updated!");
+    }
+
+    let verifyCode = "";
+
+    if (email !== userExist.email) {
+      verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    let hashPassword = "";
+
+    if (password) {
+      const salt = await bcryptjs.genSalt(10);
+      hashPassword = await bcryptjs.hash(password, salt);
+    } else {
+      hashPassword = userExist.password;
+    }
+
+    const updateUser = await UserModel.findByIdAndUpdate(
+      userId,
+      {
+        name: name,
+        mobile: mobile,
+        email: email,
+        verify_email: email ? false : true,
+        password: hashPassword,
+        otp: verifyCode !== "" ? verifyCode : null,
+        otpExpires: verifyCode !== "" ? Date.now() + 600000 : "",
+      },
+      { new: true }
+    );
+
+    if (email !== userExist.email) {
+      await sendEmailFun({
+        sendTo: email,
+        subject: "Verify email from Ecommerce App",
+        text: "",
+        html: VerificationEmailTemplate(name, verifyCode),
+      });
+    }
+
+    return response.json({
+      message: "User updated successfully",
+      error: false,
+      success: true,
+      user: updateUser,
+    });
+  } catch (error) {
+    return response.status(500).json({
+      message: error.message || error,
+      error: true,
+      success: false,
+    });
   }
 }

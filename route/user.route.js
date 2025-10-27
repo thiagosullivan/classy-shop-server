@@ -4,6 +4,7 @@ import {
   logoutController,
   registerUserController,
   removerImageFromCloudinary,
+  updateUserDetails,
   userAvatarController,
   verifyEmailController,
 } from "../controllers/user.controller.js";
@@ -17,5 +18,6 @@ userRouter.post("/login", loginUserController);
 userRouter.get("/logout", auth, logoutController);
 userRouter.put("/user-avatar", auth, upload.any(), userAvatarController);
 userRouter.delete("/delete-image", auth, removerImageFromCloudinary);
+userRouter.put("/:id", auth, updateUserDetails);
 
 export default userRouter;
