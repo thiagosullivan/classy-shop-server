@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  forgotPasswordController,
   loginUserController,
   logoutController,
   registerUserController,
@@ -19,5 +20,6 @@ userRouter.get("/logout", auth, logoutController);
 userRouter.put("/user-avatar", auth, upload.any(), userAvatarController);
 userRouter.delete("/delete-image", auth, removerImageFromCloudinary);
 userRouter.put("/:id", auth, updateUserDetails);
+userRouter.put("/forgot-password", forgotPasswordController);
 
 export default userRouter;

@@ -420,3 +420,46 @@ export async function updateUserDetails(request, response) {
     });
   }
 }
+
+export async function forgotPasswordController(request, response) {
+  try {
+    const { email } = request.body;
+
+    const user = await UserModel.findOne({ email: email });
+
+    if (!user) {
+      return response.status(400).json({
+        message: "User not found",
+        error: true,
+        success: false,
+      });
+    } else {
+      let verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      user.otp = verifyCode;
+      user.otpExpires = Date.now() + 600000;
+
+      await user.save();
+
+      // Send verification email
+      await sendEmailFun({
+        to: email,
+        subject: "Verify email from Ecommerce app",
+        text: "",
+        html: VerificationEmailTemplate(user?.name, verifyCode),
+      });
+
+      return response.json({
+        message: "Check your email",
+        error: false,
+        success: true,
+      });
+    }
+  } catch (error) {
+    return response.status(500).json({
+      message: error.message || error,
+      error: true,
+      success: false,
+    });
+  }
+}
