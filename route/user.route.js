@@ -5,6 +5,7 @@ import {
   logoutController,
   registerUserController,
   removerImageFromCloudinary,
+  resetPassword,
   updateUserDetails,
   userAvatarController,
   verifyEmailController,
@@ -22,6 +23,7 @@ userRouter.put("/user-avatar", auth, upload.any(), userAvatarController);
 userRouter.delete("/delete-image", auth, removerImageFromCloudinary);
 userRouter.put("/:id", auth, updateUserDetails);
 userRouter.post("/forgot-password", forgotPasswordController);
-userRouter.put("/verify-forgot-password-otp", verifyForgotPasswordOtp);
+userRouter.post("/verify-forgot-password-otp", verifyForgotPasswordOtp);
+userRouter.put("/reset-password", resetPassword);
 
 export default userRouter;

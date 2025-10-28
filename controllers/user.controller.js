@@ -522,3 +522,51 @@ export async function verifyForgotPasswordOtp(request, response) {
     });
   }
 }
+
+export async function resetPassword(request, response) {
+  try {
+    const { email, newPassword, confirmPassword } = request.body;
+    if (!email || !newPassword || !confirmPassword) {
+      return response.status(400).json({
+        message:
+          "provide required fields email, newpassword and confirm password",
+      });
+    }
+
+    const user = await UserModel.findOne({ email: email });
+
+    if (!user) {
+      return response.status(400).json({
+        message: "Email is not available",
+        error: true,
+        success: false,
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return response.status(400).json({
+        message: "new password and confirm password must be the same",
+        error: true,
+        success: false,
+      });
+    }
+
+    const salt = await bcryptjs.genSalt(10);
+    const hashPassword = await bcryptjs.hash(newPassword, salt);
+
+    user.password = hashPassword;
+    await user.save();
+
+    return response.json({
+      message: "Password updated successfully",
+      error: false,
+      success: true,
+    });
+  } catch (error) {
+    return response.status(400).json({
+      message: error.message || error,
+      error: true,
+      success: false,
+    });
+  }
+}
